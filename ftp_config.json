@@ -1,0 +1,34 @@
+{
+  "server": {
+    "host": "localhost",
+    "port": 2121,
+    "root_directory": "./ftp_root"
+  },
+  "users": {
+    "admin": {
+      "password": "admin123",
+      "permissions": [
+        "read",
+        "write",
+        "delete"
+      ]
+    },
+    "user": {
+      "password": "user123",
+      "permissions": [
+        "read",
+        "write"
+      ]
+    },
+    "anonymous": {
+      "password": "",
+      "permissions": [
+        "read"
+      ]
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "ftp_server.log"
+  }
+}
