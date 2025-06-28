@@ -110,6 +110,7 @@ class FTPSession:
             'PASS': self.cmd_pass,
             'PWD': self.cmd_pwd,
             'CWD': self.cmd_cwd,
+            'CDUP': self.cmd_cdup,
             'LIST': self.cmd_list,
             'RETR': self.cmd_retr,
             'STOR': self.cmd_stor,
@@ -211,36 +212,51 @@ class FTPSession:
         if not self.authenticated:
             self.send_response('530 Not logged in')
             return
-        
-        rel_path = self.current_dir.relative_to(self.root_dir)
-        path_str = '/' + str(rel_path).replace('\\', '/') if rel_path != Path('.') else '/'
-        self.send_response(f'257 "{path_str}" is current directory')
+
+        try:
+            # 确保两个路径都是绝对路径
+            root_abs = self.root_dir.resolve()
+            current_abs = self.current_dir.resolve()
+
+            rel_path = current_abs.relative_to(root_abs)
+            path_str = '/' + str(rel_path).replace('\\', '/') if rel_path != Path('.') else '/'
+            self.send_response(f'257 "{path_str}" is current directory')
+        except Exception as e:
+            logger.error(f"PWD命令错误: {e}")
+            self.send_response('500 Internal server error')
     
     def cmd_cwd(self, path):
         """CWD命令 - 改变目录"""
         if not self.authenticated:
             self.send_response('530 Not logged in')
             return
-        
+
         try:
-            if path.startswith('/'):
+            # 处理特殊路径
+            if path == '..':
+                # 返回上级目录
+                new_dir = self.current_dir.parent
+            elif path.startswith('/'):
                 new_dir = self.root_dir / path[1:]
             else:
                 new_dir = self.current_dir / path
-            
+
             new_dir = new_dir.resolve()
-            
+
             # 确保不能访问根目录之外的目录
-            if not str(new_dir).startswith(str(self.root_dir)):
+            root_str = str(self.root_dir.resolve())
+            new_str = str(new_dir)
+
+            if not new_str.startswith(root_str):
                 self.send_response('550 Permission denied')
                 return
-            
+
             if new_dir.is_dir():
                 self.current_dir = new_dir
                 self.send_response('250 Directory changed')
             else:
                 self.send_response('550 Directory not found')
-                
+
         except Exception as e:
             logger.error(f"CWD命令错误: {e}")
             self.send_response('550 Directory change failed')
@@ -468,6 +484,10 @@ class FTPSession:
         for feature in features:
             self.send_response(feature)
     
+    def cmd_cdup(self, args):
+        """CDUP命令 - 返回上级目录"""
+        self.cmd_cwd('..')
+
     def cmd_quit(self, args):
         """QUIT命令 - 退出"""
         self.send_response('221 Goodbye')
